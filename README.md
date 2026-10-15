@@ -84,8 +84,8 @@ installer is stable. The wizard shows just "Lerd", so a 0.x number is never
 mistaken for lerd's own version; Add/Remove Programs lists it as the version
 of the installed package.
 
-`.github/workflows/build.yml` builds `lerd-setup.exe` on every push and pull
-request and keeps it as a run artifact. Pushing a `v*` tag also publishes it as
+`.github/workflows/build.yml` builds `lerd-setup.exe` on every push to `main`
+and every pull request and keeps it as a run artifact. Pushing a `v*` tag also publishes it as
 a GitHub release, marked as a prerelease while on `v0.*`. No tag has been made
 yet.
 
@@ -106,8 +106,9 @@ The installer only changes when one of the things it relies on does:
 
 ## Testing an unreleased build
 
-`/local=<folder>` installs lerd from a Windows folder holding `install.sh`,
-`lerd` and `lerd.exe` instead of the latest release. `make build` in lerd-wsl
+`/local=<folder>` (or the `LERD_SETUP_LOCAL` environment variable) installs
+lerd from a Windows folder holding `install.sh`, `lerd` and `lerd.exe` instead
+of the latest release. `make build` in lerd-wsl
 leaves `lerd` and `lerd.exe` in `build\`; copy `install.sh` beside them:
 
 ```powershell
