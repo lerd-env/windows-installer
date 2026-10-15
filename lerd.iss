@@ -1126,6 +1126,11 @@ begin
   end
   else
     WizardForm.FinishedLabel.Caption := FmtMessage(CustomMessage('DoneText'), [Distro, LinuxUser]);
+  { Setup laid the page out for its own, shorter text, so grow the label to fit
+    ours and move the checkboxes below it instead of over its last lines. }
+  WizardForm.FinishedLabel.AdjustHeight;
+  WizardForm.RunList.Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(12);
+  WizardForm.RunList.Height := WizardForm.FinishedPage.ClientHeight - WizardForm.RunList.Top;
 end;
 
 { ---- uninstall ----------------------------------------------------------- }
