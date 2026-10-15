@@ -2,23 +2,21 @@
 .SYNOPSIS
   Builds lerd-setup.exe, the Inno Setup installer for lerd on Windows (WSL2).
 
-.PARAMETER LerdRepo
-  Checkout of lerd, used for the logo and the license. Defaults to ..\lerd-wsl.
-
 .PARAMETER Version
-  Version shown in Add/Remove Programs. Defaults to the repo's latest tag.
+  The installer's own version, not lerd's. Defaults to the one in lerd.iss.
 #>
 param(
-    [string]$LerdRepo = (Join-Path $PSScriptRoot '..\lerd-wsl'),
     [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
+# Copies of lerd's logo and license, so the build needs nothing outside this repo.
+$branding = Join-Path $PSScriptRoot 'branding'
 $assets = Join-Path $PSScriptRoot 'assets'
 New-Item -ItemType Directory -Force $assets | Out-Null
-$logo = [System.Drawing.Image]::FromFile((Resolve-Path (Join-Path $LerdRepo 'internal\ui\icons\icon-512.png')))
+$logo = [System.Drawing.Image]::FromFile((Join-Path $branding 'icon-512.png'))
 $brand = [System.Drawing.Color]::FromArgb(255, 45, 32)
 
 function Resize([System.Drawing.Image]$img, [int]$w, [int]$h, [System.Drawing.Color]$bg, [double]$scale) {
@@ -72,12 +70,7 @@ foreach ($scale in 1.0, 1.25, 1.5, 2.0, 2.5) {
 }
 $logo.Dispose()
 
-Copy-Item (Join-Path $LerdRepo 'LICENSE') (Join-Path $assets 'LICENSE.txt') -Force
-
-if (-not $Version) {
-    $tag = git -C $LerdRepo describe --tags --abbrev=0 2>$null
-    $Version = if ($tag) { $tag.TrimStart('v') } else { '0.0.0' }
-}
+Copy-Item (Join-Path $branding 'LICENSE') (Join-Path $assets 'LICENSE.txt') -Force
 
 $iscc = @(
     (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
@@ -86,5 +79,8 @@ $iscc = @(
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw 'ISCC.exe not found; install Inno Setup 6 (winget install JRSoftware.InnoSetup)' }
 
-& $iscc "/DAppVersion=$Version" (Join-Path $PSScriptRoot 'lerd.iss')
+$isccArgs = @()
+if ($Version) { $isccArgs += "/DAppVersion=$Version" }
+$isccArgs += Join-Path $PSScriptRoot 'lerd.iss'
+& $iscc $isccArgs
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }

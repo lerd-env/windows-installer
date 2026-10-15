@@ -3,8 +3,8 @@
 A wizard installer for lerd on Windows, the native-wizard counterpart of
 `lerd.exe --setup` (`cmd/lerd-windows/setup.go`). It is a bootstrapper: it
 prepares Windows and hands lerd itself to `install.sh`, so it carries no lerd
-binaries and always installs the latest release. The version `build.ps1`
-stamps on it only labels Add/Remove Programs.
+binaries and always installs the latest release. It has a version of its own,
+which moves only when the installer changes and says nothing about lerd's.
 
 Needs Windows 10 2004 (build 19041) or newer, x64 or Arm64.
 
@@ -53,12 +53,39 @@ rule and `%LOCALAPPDATA%\lerd`.
 ```powershell
 winget install JRSoftware.InnoSetup
 .\build.ps1                      # -> dist\lerd-setup.exe
-.\build.ps1 -Version 1.37.0      # label for Add/Remove Programs; defaults to the latest tag
+.\build.ps1 -Version 0.2.0       # overrides the version in lerd.iss
 ```
 
-`build.ps1` generates the icon and wizard images into `assets\` from the logo
-in `..\lerd-wsl` (`-LerdRepo` to change it), copies its license, and compiles
-with ISCC. `assets\` and `dist\` are not committed.
+`build.ps1` generates the icon and wizard images into `assets\` from
+`branding\`, which holds copies of lerd's logo
+(`internal/ui/icons/icon-512.png`) and license, so the build needs nothing
+outside this repo. Copy them again if lerd's change. `assets\` and `dist\` are
+not committed.
+
+## Versions and releases
+
+The version lives in `lerd.iss` (`AppVersion`). It stays on 0.x until the
+installer is stable. The wizard shows just "Lerd", so a 0.x number is never
+mistaken for lerd's own version; Add/Remove Programs lists it as the version
+of the installed package.
+
+`.github/workflows/build.yml` builds `lerd-setup.exe` on every push and pull
+request and keeps it as a run artifact. Pushing a `v*` tag also publishes it as
+a GitHub release, marked as a prerelease while on `v0.*`. No tag has been made
+yet.
+
+## When this needs updating
+
+The installer only changes when one of the things it relies on does:
+
+| It relies on | Update it when |
+|---|---|
+| The package list in `InstallPackages` | `install.sh` starts requiring another package |
+| `Ubuntu-24.04` | a newer Ubuntu LTS should be the default |
+| `https://lerd.sh/install.sh`, `lerd wsl:setup`, `lerd dns:disable`, `lerd node:unmanage`, `lerd uninstall --keep-data` | one of them moves or changes its meaning |
+| lerd's mkcert at `~/.local/share/lerd/bin/mkcert` | lerd moves it |
+| lerd's Windows side: `%LOCALAPPDATA%\lerd`, the `lerd` Run key, the NRPT rule commented `lerd`, the `sh.lerd.Lerd` toast app ID | lerd changes how `wsl:setup` installs it, so uninstalling still cleans up |
+| microsoft/WSL release assets named `*.x64.msi` / `*.arm64.msi` | Microsoft renames them |
 
 ## Testing an unreleased build
 

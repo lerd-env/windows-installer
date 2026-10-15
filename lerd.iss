@@ -5,15 +5,19 @@
 ; it acts, so running Setup again after a failure resumes where it stopped.
 ; Build with build.ps1, which generates the assets this script expects.
 
+; The installer's own version. It installs whatever lerd release is latest, so
+; this moves only when the installer changes; 0.x until it is stable.
 #ifndef AppVersion
-  #define AppVersion "0.0.0"
+  #define AppVersion "0.1.0"
 #endif
 
 [Setup]
 AppId={{6F2B7C1E-3D4A-4E8B-9C2F-1A5D8E7B4C30}
 AppName=Lerd
 AppVersion={#AppVersion}
-AppVerName=Lerd {#AppVersion}
+VersionInfoVersion={#AppVersion}
+; Without the version, which would read as lerd's own.
+AppVerName=Lerd
 AppPublisher=Lerd
 AppPublisherURL=https://lerd.sh
 AppSupportURL=https://github.com/lerd-env/lerd/issues

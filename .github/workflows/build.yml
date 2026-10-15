@@ -1,0 +1,48 @@
+name: Build
+
+# Builds lerd-setup.exe on every change and keeps it as a run artifact. A v*
+# tag also publishes it as a GitHub release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            ./build.ps1 -Version $env:GITHUB_REF_NAME.TrimStart('v')
+          } else {
+            ./build.ps1
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lerd-setup
+          path: dist/lerd-setup.exe
+          if-no-files-found: error
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 0.x is not stable yet, so its releases are marked as prereleases.
+          $extra = @()
+          if ($env:GITHUB_REF_NAME -like 'v0.*') { $extra += '--prerelease' }
+          gh release create $env:GITHUB_REF_NAME dist/lerd-setup.exe --title $env:GITHUB_REF_NAME --generate-notes @extra
