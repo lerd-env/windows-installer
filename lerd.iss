@@ -989,7 +989,6 @@ var
   Lines: TArrayOfString;
   Local, Zip, Tag: String;
   Installed: AnsiString;
-  Code: Integer;
 begin
   Result := False;
   SetStatus(CustomMessage('StepApp'));
@@ -1038,11 +1037,13 @@ begin
   DeleteFile(DesktopVersionFile);
   ForceDirectories(DesktopDir);
   AddDetail('Unpacking the desktop app');
-  { Windows' own tar unpacks zips. }
-  if not Exec(ExpandConstant('{sys}\tar.exe'), '-xf ' + Quote(Zip) + ' -C ' + Quote(DesktopDir), '', SW_HIDE, ewWaitUntilTerminated, Code)
-    or (Code <> 0) or not FileExists(DesktopExe) then
+  { Windows' own tar unpacks zips. Its complaints go to the log and the details
+    box, since a half-unpacked app opens to a black window. }
+  if not Run(CustomMessage('StepApp'), ExpandConstant('{sys}\tar.exe'), '-xf ' + Quote(Zip) + ' -C ' + Quote(DesktopDir)) then
+    Exit;
+  if not FileExists(DesktopExe) then
   begin
-    Failed := FmtMessage(CustomMessage('ErrExit'), [CustomMessage('StepApp'), IntToStr(Code)]);
+    Failed := FmtMessage(CustomMessage('ErrExit'), [CustomMessage('StepApp'), '0']);
     Exit;
   end;
   if Tag <> '' then
