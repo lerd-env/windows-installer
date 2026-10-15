@@ -22,30 +22,36 @@ Needs Windows 10 2004 (build 19041) or newer, x64 or Arm64.
    and whether lerd manages Node.js. lerd's installers take the defaults, and a
    change runs `lerd dns:disable` or `lerd node:unmanage` afterwards. Skipped
    when lerd is already installed.
-5. **lerd.** Installs Podman and the packages `install.sh` checks for, turns on
-   linger, then runs `install.sh`. The package list lives in `InstallPackages`
-   in `lerd.iss`; keep it in step with `install.sh`.
-6. **Certificate.** Imports lerd's root CA into the Windows user's store from
-   Setup itself, so Windows' confirmation comes to the front. Declining only
-   leaves a browser warning.
-7. **Windows integration**: `lerd wsl:setup`, then `lerd notify target native`,
-   since the desktop app only receives lerd's notifications from the native
-   sink.
-8. **Start.** Restarts WSL and waits for the dashboard.
-9. **Desktop app.** Downloads `lerd-desktop-win32-<arch>.zip` from the latest
+5. **Packages.** Installs Podman and the packages `install.sh` checks for, and
+   turns on linger. The package list lives in `InstallPackages` in `lerd.iss`;
+   keep it in step with `install.sh`.
+6. **Desktop app.** Downloads `lerd-desktop-win32-<arch>.zip` from the latest
    lerd-env/lerd-desktop release into `{app}\desktop`, unless that release is
    the one already there, and registers it for the signed-in user: the
    `sh.lerd.Lerd` app ID with lerd's logo, which its notifications are posted
    under, the `lerd://` scheme, a Start menu shortcut and a `lerd-desktop` Run
-   entry that starts it hidden in the tray at sign-in. Then starts it. The app
-   holds lerd's tray icon and notifications on Windows and has no installer of
-   its own. The finish page offers to open it, ends with `install.sh`'s GitHub
-   star note, and has an unticked option to open github.com/lerd-env/lerd.
+   entry that starts it hidden in the tray at sign-in. The app holds lerd's
+   tray icon and notifications on Windows, keeps lerd's agent running, and has
+   no installer of its own. It comes before lerd so that `wsl:setup` finds it
+   and leaves the agent to it: started from a Run entry of its own, the
+   unsigned agent reads to Windows Defender as malware making itself
+   persistent, and Defender has quarantined it for that.
+7. **lerd.** Runs `install.sh`.
+8. **Certificate.** Imports lerd's root CA into the Windows user's store from
+   Setup itself, so Windows' confirmation comes to the front. Declining only
+   leaves a browser warning.
+9. **Windows integration**: `lerd wsl:setup`, then `lerd notify target native`,
+   since the desktop app only receives lerd's notifications from the native
+   sink.
+10. **Start.** Restarts WSL, waits for the dashboard, and starts the desktop
+    app in the tray, which starts lerd's agent. The finish page offers to open
+    the app, ends with `install.sh`'s GitHub star note, and has an unticked
+    option to open github.com/lerd-env/lerd.
 
 Every Linux command runs under `setsid -w ... </dev/null`: Setup's hidden
 console still gives WSL a pty, and a question read from `/dev/tty` would wait
 forever. Detached, every question takes its default. The user has passwordless
-sudo (`/etc/sudoers.d/zz-lerd-setup`) only while steps 5 to 7 run.
+sudo (`/etc/sudoers.d/zz-lerd-setup`) only while steps 7 to 9 run.
 
 Every step checks before it acts, so running Setup again after a failure
 resumes where it stopped. A details box under the progress bar streams each

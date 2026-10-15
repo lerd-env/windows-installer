@@ -917,10 +917,11 @@ end;
 
 { ---- desktop app --------------------------------------------------------- }
 
-{ On Windows the Lerd desktop app holds lerd's tray icon and raises its
-  notifications, which lerd-ui hands it while it runs. Setup downloads it from
-  the latest lerd-desktop release, unpacks it under the install folder and
-  registers it with Windows itself; the app has no installer of its own. }
+{ On Windows the Lerd desktop app holds lerd's tray icon, raises its
+  notifications, which lerd-ui hands it while it runs, and keeps lerd's agent
+  running. Setup downloads it from the latest lerd-desktop release, unpacks it
+  under the install folder and registers it with Windows itself; the app has no
+  installer of its own. }
 
 function DesktopDir: String;
 begin
@@ -1078,16 +1079,18 @@ begin
   SetProgress(3);
   if not InstallPackages then Exit;
   SetProgress(4);
+  { Before lerd's wsl:setup, which leaves starting lerd's agent to the app
+    when it finds it registered, rather than to a Run entry of its own. }
+  if not InstallDesktopApp then Exit;
+  SetProgress(5);
   if not GrantSudo then Exit;
   try
     if not InstallLerd then Exit;
   finally
     RemoveSudoers;
   end;
-  SetProgress(5);
-  if not StartLerd then Exit;
   SetProgress(6);
-  if not InstallDesktopApp then Exit;
+  if not StartLerd then Exit;
   StartDesktopApp;
   SetProgress(7);
 end;
