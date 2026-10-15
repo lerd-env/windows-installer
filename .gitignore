@@ -1,0 +1,7 @@
+# build.ps1 generates these from the lerd checkout
+/assets/
+/dist/
+
+# Inno Setup compiler and editor leftovers
+*.~is
+*.log
