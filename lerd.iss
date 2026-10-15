@@ -45,6 +45,9 @@ Compression=lzma2
 SolidCompression=yes
 SetupLogging=yes
 CloseApplications=no
+; lerd lives in the installing user's WSL, so its Windows side, the desktop
+; app's registration included, goes under that user too.
+UsedUserAreasWarning=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -70,7 +73,8 @@ ReadyDistro=install the %1 distro
 ReadyUser=create the Linux user %1
 ReadyUserExisting=use the existing Linux user %1
 ReadyLerd=install Podman and lerd inside the distro
-ReadyIntegration=connect lerd with Windows: the lerd command, your site domains and the tray icon
+ReadyIntegration=connect lerd with Windows: the lerd command and your site domains
+ReadyApp=install the Lerd desktop app, which holds lerd's tray icon and notifications
 ReadyDNSManaged=serve sites at https://<name>.test with trusted certificates
 ReadyDNSLocalhost=serve sites at http://<name>.localhost
 ReadyNodeOff=leave Node.js to you
@@ -88,20 +92,23 @@ CAPrompt=Windows will now ask whether to install lerd's certificate authority.%n
 CADeclined=The certificate was not installed, so browsers will warn on your https sites. Run lerd wsl:setup inside WSL to be asked again.
 StepFeatures=Enabling the WSL features...
 StepWSL=Installing WSL...
-StepDownload=Downloading WSL (%1 of %2 MB)
+StepDownload=Downloading %1 (%2 of %3 MB)
 StepDistro=Installing %1...
 StepUser=Creating the Linux user %1...
 StepPackages=Installing Podman and the packages lerd needs...
 StepLerd=Installing lerd inside %1...
 StepIntegration=Connecting lerd with Windows...
 StepStart=Starting lerd...
+StepNotify=Handing lerd's notifications to the desktop app...
+StepApp=Installing the Lerd desktop app...
+ErrNoApp=No lerd-desktop-win32-%1.zip in the latest github.com/lerd-env/lerd-desktop release
 ErrExit=%1 failed (exit code %2)
 ErrWSLNotReady=WSL was installed but wsl.exe still does not report it
 ErrDashboard=The dashboard did not answer on 127.0.0.1:7073 within 3 minutes
 FailedHeading=Setup could not finish installing lerd
 FailedText=%1%n%nRun Setup again to resume from this step. The details are in the log:%n%2
-DoneText=lerd is running. Open a new terminal and the lerd command works from Windows too.%n%nYour sites live inside Linux, at \\wsl.localhost\%1\home\%2.%n%n★ If lerd is useful to you, a GitHub star helps others find it.
-OpenDashboard=Open the lerd dashboard
+DoneText=lerd is running, and its icon is in the tray. Open a new terminal and the lerd command works from Windows too.%n%nYour sites live inside Linux, at \\wsl.localhost\%1\home\%2.%n%n★ If lerd is useful to you, a GitHub star helps others find it.
+OpenDashboard=Open Lerd
 OpenGitHub=Star lerd on GitHub (github.com/lerd-env/lerd)
 UninstallQuestion=What should happen to the %1 distro?
 UninstallQuestionText=lerd lives in the %1 WSL distro, together with your projects and anything else you keep there.
@@ -115,13 +122,23 @@ UninstallWindows=Removing lerd from Windows...
 
 [Files]
 Source: "assets\lerd.ico"; DestDir: "{app}"; Flags: ignoreversion
+; The logo Windows shows on lerd's notifications.
+Source: "branding\icon-512.png"; DestDir: "{app}"; DestName: "lerd.png"; Flags: ignoreversion
+
+[Icons]
+; The desktop app is downloaded later, in InstallDesktopApp. The app id ties
+; the shortcut to the app's own windows and notifications.
+Name: "{userprograms}\Lerd"; Filename: "{app}\desktop\lerd-desktop.exe"; AppUserModelID: "sh.lerd.Lerd"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{commonappdata}\Lerd"
+Type: filesandordirs; Name: "{app}\desktop"
+Type: files; Name: "{app}\desktop.version"
 
 [Run]
-; runasoriginaluser so the browser does not inherit Setup's admin rights.
-Filename: "http://lerd.localhost"; Description: "{cm:OpenDashboard}"; Flags: postinstall shellexec nowait runasoriginaluser skipifsilent; Check: Succeeded
+; runasoriginaluser so the app does not inherit Setup's admin rights. It is
+; already running in the tray by then, and a second start shows its window.
+Filename: "{app}\desktop\lerd-desktop.exe"; Description: "{cm:OpenDashboard}"; Flags: postinstall nowait runasoriginaluser skipifsilent; Check: Succeeded
 ; The same nudge install.sh's star_note prints at the end of a console install.
 Filename: "https://github.com/lerd-env/lerd"; Description: "{cm:OpenGitHub}"; Flags: postinstall shellexec nowait runasoriginaluser skipifsilent unchecked; Check: Succeeded
 
@@ -132,6 +149,9 @@ const
     type it in, so the user gets passwordless sudo only while Setup runs. }
   SudoersDropIn = '/etc/sudoers.d/zz-lerd-setup';
   LxssKey = 'Software\Microsoft\Windows\CurrentVersion\Lxss';
+  RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  { The AppUserModelID lerd's own toasts use, shared by the desktop app. }
+  ToastAppID = 'sh.lerd.Lerd';
 
 var
   UserPage: TInputQueryWizardPage;
@@ -145,6 +165,7 @@ var
   Failed: String;
   DeleteDistro: Boolean;
   DetailMemo: TNewMemo;
+  DownloadName: String;
 
 function SetEnvironmentVariable(lpName, lpValue: String): BOOL;
   external 'SetEnvironmentVariableW@kernel32.dll stdcall';
@@ -617,7 +638,8 @@ begin
     if not ManageNode.Checked then
       Result := Result + Space + '- ' + CustomMessage('ReadyNodeOff') + NewLine;
   end;
-  Result := Result + Space + '- ' + CustomMessage('ReadyIntegration');
+  Result := Result + Space + '- ' + CustomMessage('ReadyIntegration') + NewLine;
+  Result := Result + Space + '- ' + CustomMessage('ReadyApp');
 end;
 
 { PrepareToInstall enables the WSL features. They only take effect after a
@@ -653,7 +675,7 @@ end;
 function DownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
 begin
   if ProgressMax > 0 then
-    WizardForm.FilenameLabel.Caption := FmtMessage(CustomMessage('StepDownload'), [
+    WizardForm.FilenameLabel.Caption := FmtMessage(CustomMessage('StepDownload'), [DownloadName,
       IntToStr(Progress div 1048576), IntToStr(ProgressMax div 1048576)]);
   Result := True;
 end;
@@ -683,6 +705,7 @@ begin
     Exit;
   end;
   AddDetail('Downloading ' + Lines[0]);
+  DownloadName := 'WSL';
   try
     DownloadTemporaryFile(Lines[0], 'lerd-wsl.msi', '', @DownloadProgress);
   except
@@ -869,7 +892,10 @@ begin
   Result := Run(FmtMessage(CustomMessage('StepLerd'), [Distro]), WSLExe, AsUser(Script))
     and ApplyOptions
     and TrustCA
-    and Run(CustomMessage('StepIntegration'), WSLExe, AsUser('~/.local/bin/lerd wsl:setup'));
+    and Run(CustomMessage('StepIntegration'), WSLExe, AsUser('~/.local/bin/lerd wsl:setup'))
+    { The desktop app only receives lerd's notifications from the native sink;
+      the browser sink, lerd's default, sends them to dashboard pages. }
+    and Run(CustomMessage('StepNotify'), WSLExe, AsUser('~/.local/bin/lerd notify target native'));
 end;
 
 { StartLerd restarts WSL so mirrored networking and the resolver handover take
@@ -889,6 +915,151 @@ begin
     Failed := CustomMessage('ErrDashboard');
 end;
 
+{ ---- desktop app --------------------------------------------------------- }
+
+{ On Windows the Lerd desktop app holds lerd's tray icon and raises its
+  notifications, which lerd-ui hands it while it runs. Setup downloads it from
+  the latest lerd-desktop release, unpacks it under the install folder and
+  registers it with Windows itself; the app has no installer of its own. }
+
+function DesktopDir: String;
+begin
+  Result := ExpandConstant('{app}\desktop');
+end;
+
+function DesktopExe: String;
+begin
+  Result := DesktopDir + '\lerd-desktop.exe';
+end;
+
+{ DesktopVersionFile records the release the app came from, so a rerun skips a
+  download it already has. }
+function DesktopVersionFile: String;
+begin
+  Result := ExpandConstant('{app}\desktop.version');
+end;
+
+function DesktopArch: String;
+begin
+  if IsArm64 then
+    Result := 'arm64'
+  else
+    Result := 'x64';
+end;
+
+function DesktopZipName: String;
+begin
+  Result := 'lerd-desktop-win32-' + DesktopArch + '.zip';
+end;
+
+{ StopDesktopApp ends a running copy of the app, which holds its files open. }
+procedure StopDesktopApp;
+var
+  Lines: TArrayOfString;
+begin
+  PowerShell('Get-Process -Name lerd-desktop -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.Path -like ''' + DesktopDir + '\*'' } | Stop-Process -Force; Start-Sleep 1', Lines);
+end;
+
+{ RegisterDesktopApp gives the app what Windows needs to treat it as lerd's:
+  the app id its notifications are posted under, with lerd's name and logo,
+  the lerd:// scheme that notification clicks open, and a start at sign-in,
+  hidden in the tray. }
+procedure RegisterDesktopApp;
+var
+  Exe, Key: String;
+begin
+  Exe := '"' + DesktopExe + '"';
+  Key := 'Software\Classes\AppUserModelId\' + ToastAppID;
+  RegWriteStringValue(HKCU, Key, 'DisplayName', 'Lerd');
+  RegWriteStringValue(HKCU, Key, 'IconUri', ExpandConstant('{app}\lerd.png'));
+  RegWriteStringValue(HKCU, 'Software\Classes\lerd', '', 'URL:Lerd');
+  RegWriteStringValue(HKCU, 'Software\Classes\lerd', 'URL Protocol', '');
+  RegWriteStringValue(HKCU, 'Software\Classes\lerd\DefaultIcon', '', Exe + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\lerd\shell\open\command', '', Exe + ' "%1"');
+  RegWriteStringValue(HKCU, RunKey, 'lerd-desktop', Exe + ' --hidden');
+end;
+
+{ InstallDesktopApp downloads the app and unpacks it. /local=<folder> takes the
+  app from a lerd-desktop-win32-<arch>.zip there when it holds one, to test an
+  unreleased build; such a zip is unpacked on every run. }
+function InstallDesktopApp: Boolean;
+var
+  Lines: TArrayOfString;
+  Local, Zip, Tag: String;
+  Installed: AnsiString;
+  Code: Integer;
+begin
+  Result := False;
+  SetStatus(CustomMessage('StepApp'));
+  Tag := '';
+  Local := ExpandConstant('{param:local|}');
+  if Local = '' then
+    Local := GetEnv('LERD_SETUP_LOCAL');
+  if (Local <> '') and FileExists(AddBackslash(Local) + DesktopZipName) then
+  begin
+    Zip := AddBackslash(Local) + DesktopZipName;
+    AddDetail('Using ' + Zip);
+  end
+  else
+  begin
+    if not PowerShell('[Net.ServicePointManager]::SecurityProtocol = ''Tls12''; ' +
+      '$r = Invoke-RestMethod https://api.github.com/repos/lerd-env/lerd-desktop/releases/latest; ' +
+      '$a = $r.assets | Where-Object { $_.name -eq ''' + DesktopZipName + ''' } | Select-Object -First 1; ' +
+      'if ($a) { $r.tag_name; $a.browser_download_url }', Lines)
+      or (GetArrayLength(Lines) < 2) then
+    begin
+      Failed := FmtMessage(CustomMessage('ErrNoApp'), [DesktopArch]);
+      Exit;
+    end;
+    Tag := Lines[0];
+    if FileExists(DesktopExe) and LoadStringFromFile(DesktopVersionFile, Installed) and (Trim(String(Installed)) = Tag) then
+    begin
+      AddDetail('The desktop app is already at ' + Tag);
+      RegisterDesktopApp;
+      Result := True;
+      Exit;
+    end;
+    AddDetail('Downloading ' + Lines[1]);
+    DownloadName := 'the Lerd desktop app';
+    try
+      DownloadTemporaryFile(Lines[1], 'lerd-desktop.zip', '', @DownloadProgress);
+    except
+      Failed := GetExceptionMessage;
+      Exit;
+    end;
+    WizardForm.FilenameLabel.Caption := '';
+    Zip := ExpandConstant('{tmp}\lerd-desktop.zip');
+  end;
+
+  StopDesktopApp;
+  DelTree(DesktopDir, True, True, True);
+  DeleteFile(DesktopVersionFile);
+  ForceDirectories(DesktopDir);
+  AddDetail('Unpacking the desktop app');
+  { Windows' own tar unpacks zips. }
+  if not Exec(ExpandConstant('{sys}\tar.exe'), '-xf ' + Quote(Zip) + ' -C ' + Quote(DesktopDir), '', SW_HIDE, ewWaitUntilTerminated, Code)
+    or (Code <> 0) or not FileExists(DesktopExe) then
+  begin
+    Failed := FmtMessage(CustomMessage('ErrExit'), [CustomMessage('StepApp'), IntToStr(Code)]);
+    Exit;
+  end;
+  if Tag <> '' then
+    SaveStringToFile(DesktopVersionFile, Tag, False);
+  RegisterDesktopApp;
+  Result := True;
+end;
+
+{ StartDesktopApp starts the app in the tray as the signed-in user, not with
+  Setup's admin rights. }
+procedure StartDesktopApp;
+var
+  Code: Integer;
+begin
+  if not ExecAsOriginalUser(DesktopExe, '--hidden', '', SW_SHOWNORMAL, ewNoWait, Code) then
+    Log('Could not start the desktop app: ' + SysErrorMessage(Code));
+end;
+
 procedure SetProgress(Step: Integer);
 begin
   WizardForm.ProgressGauge.Position := Step;
@@ -897,7 +1068,7 @@ end;
 procedure InstallLerdStack;
 begin
   WizardForm.ProgressGauge.Min := 0;
-  WizardForm.ProgressGauge.Max := 6;
+  WizardForm.ProgressGauge.Max := 7;
   SetProgress(0);
   if not EnsureWSL then Exit;
   SetProgress(1);
@@ -916,6 +1087,9 @@ begin
   SetProgress(5);
   if not StartLerd then Exit;
   SetProgress(6);
+  if not InstallDesktopApp then Exit;
+  StartDesktopApp;
+  SetProgress(7);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -974,12 +1148,17 @@ begin
 end;
 
 { RemoveWindowsSide undoes what `lerd wsl:setup` put on Windows. lerd uninstall
-  does the same from inside the distro; this covers a distro that is gone. }
+  does the same from inside the distro; this covers a distro that is gone. It
+  also stops the desktop app, so its folder can go, and takes back what
+  RegisterDesktopApp wrote. }
 procedure RemoveWindowsSide;
 var
   Lines: TArrayOfString;
 begin
   UninstallProgressForm.StatusLabel.Caption := CustomMessage('UninstallWindows');
+  StopDesktopApp;
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\lerd');
+  RegDeleteValue(HKCU, RunKey, 'lerd-desktop');
   PowerShell(
     '$d = Join-Path $env:LOCALAPPDATA ''lerd''; ' +
     { The agent exits on its own once its config is gone. }

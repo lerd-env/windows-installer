@@ -28,10 +28,19 @@ Needs Windows 10 2004 (build 19041) or newer, x64 or Arm64.
 6. **Certificate.** Imports lerd's root CA into the Windows user's store from
    Setup itself, so Windows' confirmation comes to the front. Declining only
    leaves a browser warning.
-7. **Windows integration**: `lerd wsl:setup`.
-8. **Start.** Restarts WSL and waits for the dashboard, then offers to open it.
-   The finish page ends with `install.sh`'s GitHub star note, and an unticked
-   option to open github.com/lerd-env/lerd.
+7. **Windows integration**: `lerd wsl:setup`, then `lerd notify target native`,
+   since the desktop app only receives lerd's notifications from the native
+   sink.
+8. **Start.** Restarts WSL and waits for the dashboard.
+9. **Desktop app.** Downloads `lerd-desktop-win32-<arch>.zip` from the latest
+   lerd-env/lerd-desktop release into `{app}\desktop`, unless that release is
+   the one already there, and registers it for the signed-in user: the
+   `sh.lerd.Lerd` app ID with lerd's logo, which its notifications are posted
+   under, the `lerd://` scheme, a Start menu shortcut and a `lerd-desktop` Run
+   entry that starts it hidden in the tray at sign-in. Then starts it. The app
+   holds lerd's tray icon and notifications on Windows and has no installer of
+   its own. The finish page offers to open it, ends with `install.sh`'s GitHub
+   star note, and has an unticked option to open github.com/lerd-env/lerd.
 
 Every Linux command runs under `setsid -w ... </dev/null`: Setup's hidden
 console still gives WSL a pty, and a question read from `/dev/tty` would wait
@@ -46,7 +55,7 @@ are not supported, since the Linux user's password comes from the wizard.
 Uninstalling from Add/Remove Programs asks whether to keep the distro, which
 runs `lerd uninstall --keep-data` inside it, or to delete it with everything in
 it. Either way it removes lerd's Windows side: PATH entry, login agent, DNS
-rule and `%LOCALAPPDATA%\lerd`.
+rule and `%LOCALAPPDATA%\lerd`, and the desktop app with its registration.
 
 ## Build
 
@@ -86,6 +95,8 @@ The installer only changes when one of the things it relies on does:
 | lerd's mkcert at `~/.local/share/lerd/bin/mkcert` | lerd moves it |
 | lerd's Windows side: `%LOCALAPPDATA%\lerd`, the `lerd` Run key, the NRPT rule commented `lerd`, the `sh.lerd.Lerd` toast app ID | lerd changes how `wsl:setup` installs it, so uninstalling still cleans up |
 | microsoft/WSL release assets named `*.x64.msi` / `*.arm64.msi` | Microsoft renames them |
+| lerd-env/lerd-desktop release assets named `lerd-desktop-win32-x64.zip` / `lerd-desktop-win32-arm64.zip`, with `lerd-desktop.exe` at their root | lerd-desktop renames them or the executable |
+| `lerd notify target native` | lerd renames the command, or the desktop app's notifications move off the native sink |
 
 ## Testing an unreleased build
 
@@ -96,6 +107,11 @@ leaves `lerd` and `lerd.exe` in `build\`; copy `install.sh` beside them:
 ```powershell
 dist\lerd-setup.exe /local=C:\path\to\lerd-wsl\build
 ```
+
+The same folder can hold an unreleased desktop app: `npm run package:win` in
+lerd-desktop leaves `lerd-desktop-win32-x64.zip` (and the arm64 one) in its
+`dist\`; copy the one for the machine beside the rest. Setup takes the app from
+there when it is present, and from the latest lerd-desktop release otherwise.
 
 `..\lerd-test-vm` has double-click scripts for a Hyper-V test VM that roll back
 to a clean Windows, or one with the WSL features already enabled, and copy the
