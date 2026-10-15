@@ -14,7 +14,7 @@
   <a href="https://lerd.sh/getting-started/wsl2"><img src="https://img.shields.io/badge/docs-lerd.sh-blue" alt="Docs"></a>
   <img src="https://img.shields.io/badge/Windows-10%202004%2B%20%C2%B7%2011-0078d4" alt="Windows 10 2004+ and 11">
   <img src="https://img.shields.io/badge/arch-x64%20%C2%B7%20Arm64-lightgrey" alt="x64 and Arm64">
-  <a href="branding/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
 Lerd runs Nginx, PHP-FPM and every service as rootless containers, with a dashboard, a TUI, a CLI and an MCP server for your AI assistant. On Windows that stack lives inside WSL2, and getting there by hand means switching on Windows features, rebooting, installing a distro, enabling systemd, wiring up networking and DNS, and trusting a certificate. **This installer does all of it for you.**
