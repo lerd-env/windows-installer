@@ -96,8 +96,9 @@ ErrWSLNotReady=WSL was installed but wsl.exe still does not report it
 ErrDashboard=The dashboard did not answer on 127.0.0.1:7073 within 3 minutes
 FailedHeading=Setup could not finish installing lerd
 FailedText=%1%n%nRun Setup again to resume from this step. The details are in the log:%n%2
-DoneText=lerd is running. Open a new terminal and the lerd command works from Windows too.%n%nYour sites live inside Linux, at \\wsl.localhost\%1\home\%2.
+DoneText=lerd is running. Open a new terminal and the lerd command works from Windows too.%n%nYour sites live inside Linux, at \\wsl.localhost\%1\home\%2.%n%n★ If lerd is useful to you, a GitHub star helps others find it.
 OpenDashboard=Open the lerd dashboard
+OpenGitHub=Star lerd on GitHub (github.com/lerd-env/lerd)
 UninstallQuestion=What should happen to the %1 distro?
 UninstallQuestionText=lerd lives in the %1 WSL distro, together with your projects and anything else you keep there.
 UninstallKeepDistro=Keep the distro, remove only lerd%nDatabases and lerd's settings are kept for a later reinstall.
@@ -117,6 +118,8 @@ Type: filesandordirs; Name: "{commonappdata}\Lerd"
 [Run]
 ; runasoriginaluser so the browser does not inherit Setup's admin rights.
 Filename: "http://lerd.localhost"; Description: "{cm:OpenDashboard}"; Flags: postinstall shellexec nowait runasoriginaluser skipifsilent; Check: Succeeded
+; The same nudge install.sh's star_note prints at the end of a console install.
+Filename: "https://github.com/lerd-env/lerd"; Description: "{cm:OpenGitHub}"; Flags: postinstall shellexec nowait runasoriginaluser skipifsilent unchecked; Check: Succeeded
 
 [Code]
 const
